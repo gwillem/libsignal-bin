@@ -1,0 +1,97 @@
+name: Build libsignal FFI
+
+on:
+  workflow_dispatch:
+    inputs:
+      libsignal_version:
+        description: "libsignal version tag (e.g., v0.87.0)"
+        required: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            artifact: libsignal_ffi-darwin-arm64.a
+            gen_header: true
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact: libsignal_ffi-linux-amd64.a
+            gen_header: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Install musl tools (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Install Rust nightly
+        run: |
+          rustup install nightly
+          rustup target add --toolchain nightly ${{ matrix.target }}
+
+      - name: Install cbindgen
+        if: matrix.gen_header
+        run: cargo install cbindgen
+
+      - name: Clone libsignal
+        run: git clone --depth 1 --branch ${{ inputs.libsignal_version }} https://github.com/signalapp/libsignal.git
+
+      - name: Build libsignal_ffi
+        run: |
+          cd libsignal
+          cargo +nightly build --release \
+            --target ${{ matrix.target }} \
+            --manifest-path rust/bridge/ffi/Cargo.toml
+
+      - name: Generate header
+        if: matrix.gen_header
+        run: |
+          cd libsignal
+          cbindgen --profile release rust/bridge/ffi -o ../libsignal-ffi.h
+
+      - name: Copy artifact
+        run: cp libsignal/target/${{ matrix.target }}/release/libsignal_ffi.a ${{ matrix.artifact }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+      - name: Upload header
+        if: matrix.gen_header
+        uses: actions/upload-artifact@v4
+        with:
+          name: libsignal-ffi.h
+          path: libsignal-ffi.h
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.libsignal_version }}
+          name: libsignal ${{ inputs.libsignal_version }}
+          body: |
+            Pre-compiled libsignal FFI binaries for [signalapp/libsignal@${{ inputs.libsignal_version }}](https://github.com/signalapp/libsignal/releases/tag/${{ inputs.libsignal_version }}).
+
+            ## Assets
+            - `libsignal_ffi-darwin-arm64.a` — macOS ARM64
+            - `libsignal_ffi-linux-amd64.a` — Linux x86_64 (musl)
+            - `libsignal-ffi.h` — C header (platform-independent)
+          files: artifacts/*
