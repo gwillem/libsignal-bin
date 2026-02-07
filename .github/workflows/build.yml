@@ -27,8 +27,12 @@ jobs:
       - name: Install musl tools (Linux only)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update && sudo apt-get install -y musl-tools
+          sudo apt-get update && sudo apt-get install -y musl-tools protobuf-compiler
           sudo ln -sf /usr/bin/g++ /usr/bin/x86_64-linux-musl-g++
+
+      - name: Install protobuf (macOS only)
+        if: runner.os == 'macOS'
+        run: brew install protobuf
 
       - name: Install Rust nightly
         run: |
