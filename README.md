@@ -25,4 +25,6 @@ Or use `make deps-download` in signal-go.
 
 ## Building
 
-Trigger the GitHub Actions workflow manually with the desired libsignal version tag.
+```bash
+gh workflow run build.yml -f libsignal_version=v0.87.0
+```
