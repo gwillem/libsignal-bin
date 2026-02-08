@@ -53,6 +53,7 @@ jobs:
             --target ${{ matrix.target }} \
             --manifest-path rust/bridge/ffi/Cargo.toml
         env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.target == 'aarch64-apple-darwin' && '14.0' || '' }}
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.target == 'x86_64-unknown-linux-musl' && 'x86_64-linux-musl-gcc' || '' }}
 
       - name: Generate header
